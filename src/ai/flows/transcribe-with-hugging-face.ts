@@ -55,13 +55,16 @@ export async function synthesizeSpeechWithHuggingFace(
   }
 
   const audioBlob = await response.blob();
-  const reader = new FileReader();
   
   return new Promise((resolve, reject) => {
+    const reader = new FileReader();
     reader.onloadend = () => {
       resolve({ audioDataUri: reader.result as string });
     };
-    reader.onerror = reject;
+    reader.onerror = (error) => {
+        console.error("FileReader error:", error);
+        reject(new Error("Failed to read the synthesized audio data."));
+    };
     reader.readAsDataURL(audioBlob);
   });
 }

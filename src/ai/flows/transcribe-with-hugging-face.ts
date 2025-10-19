@@ -2,7 +2,6 @@
 /**
  * @fileOverview A flow that transcribes audio using a Hugging Face Inference Endpoint.
  */
-import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
 const TranscribeInputSchema = z.object({
@@ -17,17 +16,23 @@ export async function transcribeWithHuggingFace(
   input: z.infer<typeof TranscribeInputSchema>
 ): Promise<string> {
   const model = 'openai/whisper-large-v3';
+  const apiKey = process.env.HUGGINGFACE_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Hugging Face API key is not set. Please add HUGGINGFACE_API_KEY to your .env file.');
+  }
 
   try {
+    const audioBlob = await (await fetch(input.audioDataUri)).blob();
+
     const response = await fetch(
       `https://api-inference.huggingface.co/models/${model}`,
       {
         headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
         },
         method: 'POST',
-        body: input.audioDataUri,
+        body: audioBlob,
       }
     );
 
@@ -44,16 +49,8 @@ export async function transcribeWithHuggingFace(
 
     if (result && result.text) {
         return result.text;
-    } else if (result && Array.isArray(result) && result[0] && result[0].generated_text) {
-        // Handle cases where the response is an array with a single object
-        return result[0].generated_text;
     } else {
-        // Handle cases where the transcription is directly in the root object
-        const transcription = result.generated_text || result.text;
-        if(typeof transcription === 'string') {
-          return transcription;
-        }
-        throw new Error('Transcription not found in the expected format.');
+      throw new Error('Transcription not found in the expected format.');
     }
 
   } catch (error: any) {

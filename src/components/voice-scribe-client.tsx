@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Copy, LoaderCircle, Mic, Play, RefreshCw, Square, Sparkles, Voicemail, WandSparkles } from "lucide-react";
 import { useEffect, useRef, useState, type FC } from "react";
 
-type Status = "initial" | "recording" | "processing" | "success" | "synthesizing" | "error";
+type Status = "initial" | "recording" | "processing" | "synthesizing" | "error";
 
 export const VoiceScribeClient: FC = () => {
   const [status, setStatus] = useState<Status>("initial");
@@ -73,20 +73,21 @@ export const VoiceScribeClient: FC = () => {
       recognitionRef.current.interimResults = true;
       
       let finalTranscript = '';
+      let interimTranscript = '';
 
       recognitionRef.current.onresult = (event: any) => {
-        let interimTranscript = '';
-        finalTranscript = ''; // Reset final transcript to rebuild from results
+        interimTranscript = '';
+        finalTranscript = '';
         for (let i = 0; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript + ' ';
+            finalTranscript += event.results[i][0].transcript;
           } else {
             interimTranscript += event.results[i][0].transcript;
           }
         }
         setInitialTranscription(finalTranscript + interimTranscript);
       };
-
+      
       recognitionRef.current.onerror = (event: any) => {
         console.error("Speech recognition error", event.error);
         if (event.error !== 'aborted') {
@@ -100,8 +101,10 @@ export const VoiceScribeClient: FC = () => {
       };
       
       recognitionRef.current.onend = () => {
-        if (status === 'recording') {
-          handleStopRecording();
+        // This can be triggered by stop() or by the browser itself.
+        // We only want to advance state if we were in the 'recording' state.
+        if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
         }
       };
 
@@ -115,11 +118,12 @@ export const VoiceScribeClient: FC = () => {
         const audioUrl = URL.createObjectURL(audioBlob);
         setOriginalAudioURL(audioUrl);
         
-        setStatus("processing"); 
-
-        const finalFinalTranscript = finalTranscript.trim();
-        setInitialTranscription(finalFinalTranscript);
+        // Use the final transcript captured during recognition.
+        const finalFinalTranscript = finalTranscript.trim() || interimTranscript.trim();
         setTranscription(finalFinalTranscript);
+        setInitialTranscription(finalFinalTranscript); // ensure display is up to date
+        
+        setStatus("processing");
       };
 
       mediaRecorderRef.current.start();
@@ -137,12 +141,10 @@ export const VoiceScribeClient: FC = () => {
   };
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
     if (recognitionRef.current) {
         recognitionRef.current.stop();
     }
+    // onend handler for recognition will stop the media recorder
   };
 
   const handlePlayBrowserTTS = (text: string) => {
@@ -191,7 +193,7 @@ export const VoiceScribeClient: FC = () => {
   const renderSynthesizeButton = () => {
       return (
           <div className="flex flex-col items-center gap-4 mt-6">
-              <Button onClick={handleSynthesize} size="lg">
+              <Button onClick={handleSynthesize} size="lg" disabled={!transcription}>
                   <WandSparkles className="mr-2" />
                   Synthesize with AI
               </Button>
@@ -328,4 +330,5 @@ export const VoiceScribeClient: FC = () => {
       {renderContent()}
     </div>
   );
-};
+
+    

@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'Voicecribe',
-  description: 'Record, transcribe, and play back your voice with AI assistance.',
+  title: 'Vitalink - Blood Bank',
+  description: 'Connecting blood donors with those in need.',
 };
 
 export default function RootLayout({

@@ -27,9 +27,9 @@ export const VoiceScribeClient: FC = () => {
   const [SpeechRecognition, setSpeechRecognition] = useState<any>(null);
 
   useEffect(() => {
-    const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (sr) {
-        setSpeechRecognition(() => sr);
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognitionAPI) {
+        setSpeechRecognition(() => SpeechRecognitionAPI);
     }
   }, []);
 
@@ -305,5 +305,3 @@ export const VoiceScribeClient: FC = () => {
     </div>
   );
 };
-
-    

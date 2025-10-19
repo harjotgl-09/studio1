@@ -1,6 +1,6 @@
 "use client";
 
-import { improveTranscriptionAccuracy } from "@/ai/flows/improve-transcription-accuracy";
+import { transcribeWithHuggingFace } from "@/ai/flows/transcribe-with-hugging-face";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,9 +27,12 @@ export const VoiceScribeClient: FC = () => {
   const [SpeechRecognition, setSpeechRecognition] = useState<any>(null);
 
   useEffect(() => {
+    // This effect runs only on the client
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognitionAPI) {
         setSpeechRecognition(() => SpeechRecognitionAPI);
+    } else {
+        console.warn("Web Speech API is not supported by this browser.");
     }
   }, []);
 
@@ -50,7 +53,7 @@ export const VoiceScribeClient: FC = () => {
         variant: 'destructive',
         title: 'Browser Not Supported',
         description:
-          'Your browser does not support the Web Speech API. Please try Chrome or Safari.',
+          'Your browser does not support the Web Speech API. Please try a different browser like Chrome or Safari.',
       });
       return;
     }
@@ -71,9 +74,10 @@ export const VoiceScribeClient: FC = () => {
 
       recognitionRef.current.onresult = (event: any) => {
         let interimTranscript = '';
+        finalTranscriptRef.current = event.results[0][0].transcript;
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+            finalTranscriptRef.current += event.results[i][0].transcript;
           } else {
             interimTranscript += event.results[i][0].transcript;
           }
@@ -142,21 +146,20 @@ export const VoiceScribeClient: FC = () => {
     setStatus("processing");
   };
 
-  const handleImproveTranscription = async () => {
-    if (!audioDataUri || !rawTranscription) return;
+  const handleHuggingFaceTranscription = async () => {
+    if (!audioDataUri) return;
     setStatus("improving");
     try {
-      const result = await improveTranscriptionAccuracy({
+      const result = await transcribeWithHuggingFace({
         audioDataUri,
-        originalTranscription: rawTranscription,
       });
-      setImprovedTranscription(result.improvedTranscription);
-    } catch (error) {
-      console.error("Improvement failed:", error);
+      setImprovedTranscription(result.transcription);
+    } catch (error: any) {
+      console.error("Hugging Face transcription failed:", error);
       toast({
         variant: "destructive",
-        title: "Improvement Failed",
-        description: "Could not improve the transcription. Please try again.",
+        title: "Transcription Failed",
+        description: error.message || "Could not transcribe with the selected model. Please try again.",
       });
     } finally {
       setStatus("success");
@@ -239,7 +242,7 @@ export const VoiceScribeClient: FC = () => {
             <CardHeader>
               <CardTitle className="font-headline">Your Transcription</CardTitle>
               <CardDescription>
-                Review your transcription, play back the audio, and use AI to improve accuracy.
+                Review your transcription, play back the audio, and use the fine-tuned model to improve accuracy.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -248,7 +251,7 @@ export const VoiceScribeClient: FC = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                    {improvedTranscription ? 'AI-Improved Transcription' : 'Transcription'}
+                    {improvedTranscription ? 'Wav2Vec2 Transcription' : 'Browser Transcription'}
                 </label>
                 <Textarea
                   readOnly
@@ -259,19 +262,19 @@ export const VoiceScribeClient: FC = () => {
               </div>
 
               {rawTranscription && !improvedTranscription && (
-                 <Button onClick={handleImproveTranscription} disabled={status === "improving"} className="w-full">
+                 <Button onClick={handleHuggingFaceTranscription} disabled={status === "improving"} className="w-full">
                     {status === "improving" ? (
                       <LoaderCircle className="animate-spin mr-2" />
                     ) : (
                       <Wand2 className="mr-2" />
                     )}
-                    {status === "improving" ? "Improving..." : "Improve with AI"}
+                    {status === "improving" ? "Transcribing..." : "Transcribe with Wav2Vec2"}
                   </Button>
               )}
 
               {improvedTranscription && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Original Transcription</label>
+                  <label className="text-sm font-medium text-muted-foreground">Original Browser Transcription</label>
                   <Textarea
                     readOnly
                     value={rawTranscription}

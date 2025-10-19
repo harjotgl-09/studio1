@@ -1,28 +1,24 @@
 
 "use client";
 
-import { transcribeWithHuggingFace } from "@/ai/flows/transcribe-with-hugging-face";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Copy, LoaderCircle, Mic, Play, RefreshCw, Square, Voicemail, Wand2 } from "lucide-react";
+import { Check, Copy, LoaderCircle, Mic, Play, RefreshCw, Square, Voicemail } from "lucide-react";
 import { useEffect, useRef, useState, type FC } from "react";
 
-type Status = "initial" | "recording" | "processing" | "success" | "improving" | "error";
+type Status = "initial" | "recording" | "processing" | "success" | "error";
 
 export const VoiceScribeClient: FC = () => {
   const [status, setStatus] = useState<Status>("initial");
-  const [rawTranscription, setRawTranscription] = useState<string>("");
-  const [improvedTranscription, setImprovedTranscription] = useState<string>("");
+  const [transcription, setTranscription] = useState<string>("");
   const [audioURL, setAudioURL] = useState<string>("");
-  const [audioDataUri, setAudioDataUri] = useState<string>("");
   const [isCopied, setIsCopied] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<any | null>(null);
-  const finalTranscriptRef = useRef<string>("");
   const { toast } = useToast();
 
   const [SpeechRecognition, setSpeechRecognition] = useState<any>(null);
@@ -60,9 +56,7 @@ export const VoiceScribeClient: FC = () => {
     }
 
     setStatus("recording");
-    finalTranscriptRef.current = ""; 
-    setRawTranscription("");
-    setImprovedTranscription("");
+    setTranscription("");
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -72,10 +66,12 @@ export const VoiceScribeClient: FC = () => {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
+      
+      let finalTranscript = '';
 
       recognitionRef.current.onresult = (event: any) => {
         let interimTranscript = '';
-        let finalTranscript = '';
+        finalTranscript = ''; // Reset final transcript to rebuild it
         for (let i = 0; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
             finalTranscript += event.results[i][0].transcript;
@@ -83,8 +79,7 @@ export const VoiceScribeClient: FC = () => {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        finalTranscriptRef.current = finalTranscript;
-        setRawTranscription(finalTranscript + interimTranscript);
+        setTranscription(finalTranscript + interimTranscript);
       };
 
       recognitionRef.current.onerror = (event: any) => {
@@ -114,15 +109,8 @@ export const VoiceScribeClient: FC = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const audioUrl = URL.createObjectURL(audioBlob);
         setAudioURL(audioUrl);
-
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-          const base64DataUri = reader.result as string;
-          setAudioDataUri(base64DataUri);
-          setStatus("success");
-          setRawTranscription(finalTranscriptRef.current.trim());
-        };
+        setStatus("success");
+        setTranscription(finalTranscript.trim());
       };
 
       mediaRecorderRef.current.start();
@@ -148,26 +136,6 @@ export const VoiceScribeClient: FC = () => {
     setStatus("processing");
   };
 
-  const handleHuggingFaceTranscription = async () => {
-    if (!audioDataUri) return;
-    setStatus("improving");
-    try {
-      const result = await transcribeWithHuggingFace({
-        audioDataUri,
-      });
-      setImprovedTranscription(result.transcription);
-    } catch (error: any) {
-      console.error("Hugging Face transcription failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Transcription Failed",
-        description: error.message || "Could not transcribe with the selected model. Please try again.",
-      });
-    } finally {
-      setStatus("success");
-    }
-  };
-
   const handlePlayTranscription = (text: string) => {
     if ('speechSynthesis' in window && text) {
       window.speechSynthesis.cancel();
@@ -184,11 +152,8 @@ export const VoiceScribeClient: FC = () => {
   
   const handleReset = () => {
     setStatus("initial");
-    setRawTranscription("");
-    setImprovedTranscription("");
+    setTranscription("");
     setAudioURL("");
-    setAudioDataUri("");
-    finalTranscriptRef.current = "";
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
@@ -222,7 +187,7 @@ export const VoiceScribeClient: FC = () => {
             </div>
             <h2 className="text-2xl font-semibold font-headline">Recording...</h2>
             <p className="text-muted-foreground">Speak now. Press stop when you're finished.</p>
-            <Textarea readOnly value={rawTranscription || 'Listening...'} className="min-h-[100px] text-center bg-transparent border-0 text-lg" />
+            <Textarea readOnly value={transcription || 'Listening...'} className="min-h-[100px] text-center bg-transparent border-0 text-lg" />
             <Button variant="destructive" size="lg" className="rounded-full w-48 h-16 text-lg gap-3" onClick={handleStopRecording}>
               <Square size={24} /> Stop
             </Button>
@@ -238,13 +203,12 @@ export const VoiceScribeClient: FC = () => {
         );
       case "improving":
       case "success":
-        const textToDisplay = improvedTranscription || rawTranscription;
         return (
           <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
               <CardTitle className="font-headline">Your Transcription</CardTitle>
               <CardDescription>
-                Review your transcription, play back the audio, and use the fine-tuned model to improve accuracy.
+                Review your transcription and play back the audio.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -253,48 +217,25 @@ export const VoiceScribeClient: FC = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                    {improvedTranscription ? 'Wav2Vec2 Transcription' : 'Browser Transcription'}
+                    Transcription
                 </label>
                 <Textarea
                   readOnly
-                  value={textToDisplay}
+                  value={transcription}
                   className="h-40 text-base bg-background"
                   aria-label="Transcription text"
                 />
               </div>
-
-              {rawTranscription && !improvedTranscription && (
-                 <Button onClick={handleHuggingFaceTranscription} disabled={status === "improving"} className="w-full">
-                    {status === "improving" ? (
-                      <LoaderCircle className="animate-spin mr-2" />
-                    ) : (
-                      <Wand2 className="mr-2" />
-                    )}
-                    {status === "improving" ? "Transcribing..." : "Transcribe with Wav2Vec2"}
-                  </Button>
-              )}
-
-              {improvedTranscription && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Original Browser Transcription</label>
-                  <Textarea
-                    readOnly
-                    value={rawTranscription}
-                    className="h-28 text-base bg-secondary/30"
-                    aria-label="Original transcription text"
-                  />
-                </div>
-              )}
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4">
                <Button variant="outline" onClick={handleReset}>
                 <RefreshCw size={16} className="mr-2" /> Record New
               </Button>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={() => handlePlayTranscription(textToDisplay)} aria-label="Play transcription">
+                <Button variant="ghost" size="icon" onClick={() => handlePlayTranscription(transcription)} aria-label="Play transcription">
                   <Play />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleCopy(textToDisplay)} aria-label="Copy transcription">
+                <Button variant="ghost" size="icon" onClick={() => handleCopy(transcription)} aria-label="Copy transcription">
                   {isCopied ? <Check className="text-green-500" /> : <Copy />}
                 </Button>
               </div>

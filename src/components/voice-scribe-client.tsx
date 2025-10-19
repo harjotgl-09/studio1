@@ -17,6 +17,7 @@ export const VoiceScribeClient: FC = () => {
   const [audioURL, setAudioURL] = useState<string>("");
   const [isCopied, setIsCopied] = useState(false);
   const [audioDataUri, setAudioDataUri] = useState<string>('');
+  const [initialTranscription, setInitialTranscription] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -26,7 +27,6 @@ export const VoiceScribeClient: FC = () => {
   const [SpeechRecognition, setSpeechRecognition] = useState<any>(null);
 
   useEffect(() => {
-    // This effect runs only on the client
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognitionAPI) {
         setSpeechRecognition(() => SpeechRecognitionAPI);
@@ -58,6 +58,7 @@ export const VoiceScribeClient: FC = () => {
     }
 
     setTranscription("");
+    setInitialTranscription("");
     setAudioURL("");
     setAudioDataUri("");
     setStatus("recording");
@@ -75,14 +76,15 @@ export const VoiceScribeClient: FC = () => {
 
       recognitionRef.current.onresult = (event: any) => {
         let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        finalTranscript = ''; // Reset final transcript to rebuild from results
+        for (let i = 0; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
             finalTranscript += event.results[i][0].transcript + ' ';
           } else {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        setTranscription(finalTranscript + interimTranscript);
+        setInitialTranscription(finalTranscript + interimTranscript);
       };
 
       recognitionRef.current.onerror = (event: any) => {
@@ -121,7 +123,9 @@ export const VoiceScribeClient: FC = () => {
             setStatus("success");
         };
 
-        setTranscription(finalTranscript.trim());
+        const finalFinalTranscript = finalTranscript.trim();
+        setInitialTranscription(finalFinalTranscript);
+        setTranscription(finalFinalTranscript);
       };
 
       mediaRecorderRef.current.start();
@@ -165,6 +169,7 @@ export const VoiceScribeClient: FC = () => {
   const handleReset = () => {
     setStatus("initial");
     setTranscription("");
+    setInitialTranscription("");
     setAudioURL("");
     setAudioDataUri("");
     if (window.speechSynthesis) {
@@ -183,12 +188,24 @@ export const VoiceScribeClient: FC = () => {
       console.error(e);
       toast({
         variant: 'destructive',
-        title: 'Transcription Improvement Failed',
-        description: e.message || 'Could not improve transcription.',
+        title: 'Transcription Failed',
+        description: e.message || 'Could not transcribe audio.',
       });
       setStatus('error');
     }
   };
+  
+  const renderTranscribeButton = () => {
+      return (
+          <div className="flex flex-col items-center gap-4 mt-6">
+              <Button onClick={handleImproveTranscription} size="lg">
+                  <Sparkles className="mr-2" />
+                  Transcribe with Whisper
+              </Button>
+               <p className="text-sm text-muted-foreground">Compare the browser's transcription with a state-of-the-art model.</p>
+          </div>
+      )
+  }
 
   const renderContent = () => {
     switch (status) {
@@ -217,7 +234,7 @@ export const VoiceScribeClient: FC = () => {
             </div>
             <h2 className="text-2xl font-semibold font-headline">Recording...</h2>
             <p className="text-muted-foreground">Speak now. Press stop when you're finished.</p>
-            <Textarea readOnly value={transcription || 'Listening...'} className="min-h-[100px] text-center bg-transparent border-0 text-lg" />
+            <Textarea readOnly value={initialTranscription || 'Listening...'} className="min-h-[100px] text-center bg-transparent border-0 text-lg" />
             <Button variant="destructive" size="lg" className="rounded-full w-48 h-16 text-lg gap-3" onClick={handleStopRecording}>
               <Square size={24} /> Stop
             </Button>
@@ -235,7 +252,7 @@ export const VoiceScribeClient: FC = () => {
         return (
           <div className="text-center flex flex-col items-center gap-4">
              <LoaderCircle size={64} className="text-primary animate-spin" />
-             <h2 className="text-2xl font-semibold font-headline">Improving with AI...</h2>
+             <h2 className="text-2xl font-semibold font-headline">Transcribing with Whisper...</h2>
              <p className="text-muted-foreground">Using the advanced model to refine your transcription.</p>
           </div>
         );
@@ -271,7 +288,7 @@ export const VoiceScribeClient: FC = () => {
               <div className="flex items-center gap-2">
                  <Button onClick={handleImproveTranscription}>
                     <Sparkles className="mr-2" />
-                    Improve with AI
+                    Improve with Whisper
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => handlePlayTranscription(transcription)} aria-label="Play transcription">
                   <Play />

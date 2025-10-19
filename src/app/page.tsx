@@ -18,7 +18,6 @@ export default function Home() {
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const audioPlayerRef = useRef<HTMLAudioElement>(null); // Ref for the <audio> element
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -87,6 +86,9 @@ export default function Home() {
       setBrowserTranscription('');
       setAiTranscription('');
       setTranscriptionError(null);
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
       setAudioUrl(null); 
 
       if (recognitionRef.current) {
@@ -161,9 +163,9 @@ export default function Home() {
   };
   
   const handlePlayRecording = () => {
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.currentTime = 0;
-      audioPlayerRef.current.play().catch(e => console.error("Playback error:", e));
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.play().catch(e => console.error("Playback error:", e));
     }
   };
 
@@ -223,7 +225,6 @@ export default function Home() {
                     <div className="w-full bg-muted rounded-full h-2 flex items-center justify-center">
                        <p className="text-sm text-muted-foreground">Your recording</p>
                     </div>
-                    <audio ref={audioPlayerRef} src={audioUrl} className="hidden" />
                 </div>
               )}
 

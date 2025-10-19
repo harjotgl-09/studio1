@@ -14,7 +14,6 @@ export default function Home() {
   const [browserTranscription, setBrowserTranscription] = useState('');
   const [aiTranscription, setAiTranscription] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -58,7 +57,6 @@ export default function Home() {
     setAiTranscription('');
     setTranscriptionError(null);
     setAudioUrl(null); 
-    setAudioBlob(null);
     audioChunksRef.current = [];
 
     try {
@@ -71,32 +69,6 @@ export default function Home() {
         }
       };
 
-      mediaRecorderRef.current.onstop = () => {
-        const newAudioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(newAudioBlob);
-
-        // Convert blob to base64 data URI for reliable playback and transcription
-        const reader = new FileReader();
-        reader.readAsDataURL(newAudioBlob);
-        reader.onloadend = () => {
-          const base64Audio = reader.result as string;
-          setAudioUrl(base64Audio);
-        };
-        reader.onerror = () => {
-          console.error("FileReader error");
-          toast({
-              variant: "destructive",
-              title: "File Reading Error",
-              description: "Could not read the recorded audio data.",
-          });
-        };
-
-        // Clean up stream
-        if (mediaRecorderRef.current?.stream) {
-            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-        }
-      };
-      
       mediaRecorderRef.current.start();
       
       if (recognitionRef.current) {
@@ -121,6 +93,31 @@ export default function Home() {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
+
+      // Use a short timeout to ensure all data chunks are collected before processing
+      setTimeout(() => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64Audio = reader.result as string;
+          setAudioUrl(base64Audio);
+        };
+        reader.onerror = () => {
+          console.error("FileReader error");
+          toast({
+              variant: "destructive",
+              title: "File Reading Error",
+              description: "Could not read the recorded audio data.",
+          });
+        };
+
+        // Clean up stream
+        if (mediaRecorderRef.current?.stream) {
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+      }, 100);
     }
   };
   

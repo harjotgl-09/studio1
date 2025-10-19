@@ -226,7 +226,7 @@ export default function Home() {
               )}
               <audio 
                   ref={audioPlayerRef}
-                  src={audioUrl || ''}
+                  src={audioUrl || undefined}
                   onCanPlay={() => setIsAudioPlayable(true)}
                   className="hidden"
               />

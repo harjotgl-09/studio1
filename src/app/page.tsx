@@ -62,11 +62,19 @@ export default function Home() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
-
+      
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const newAudioUrl = URL.createObjectURL(audioBlob);
+        setAudioUrl(newAudioUrl);
+        // Clean up stream tracks
+        stream.getTracks().forEach(track => track.stop());
       };
       
       mediaRecorderRef.current.start();
@@ -93,17 +101,6 @@ export default function Home() {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-
-      // Use a timeout to ensure all 'onstop' and 'ondataavailable' events have fired.
-      setTimeout(() => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = () => {
-          const base64Audio = reader.result as string;
-          setAudioUrl(base64Audio);
-        };
-      }, 100); // A small delay is sufficient
     }
   };
   

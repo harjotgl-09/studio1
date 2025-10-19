@@ -14,6 +14,7 @@ export default function Home() {
   const [browserTranscription, setBrowserTranscription] = useState('');
   const [aiTranscription, setAiTranscription] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -57,6 +58,7 @@ export default function Home() {
     setAiTranscription('');
     setTranscriptionError(null);
     setAudioUrl(null); 
+    setAudioBlob(null);
     audioChunksRef.current = [];
 
     try {
@@ -67,14 +69,6 @@ export default function Home() {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
-      };
-
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const newAudioUrl = URL.createObjectURL(audioBlob);
-        setAudioUrl(newAudioUrl);
-        // Clean up stream tracks
-        stream.getTracks().forEach(track => track.stop());
       };
       
       mediaRecorderRef.current.start();
@@ -96,6 +90,17 @@ export default function Home() {
 
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.onstop = () => {
+        const newAudioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const newAudioUrl = URL.createObjectURL(newAudioBlob);
+        setAudioBlob(newAudioBlob);
+        setAudioUrl(newAudioUrl);
+        
+        // Clean up stream
+        if (mediaRecorderRef.current?.stream) {
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+      };
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (recognitionRef.current) {
@@ -105,7 +110,7 @@ export default function Home() {
   };
   
   const handleTranscribe = async () => {
-    if (!audioUrl) {
+    if (!audioBlob) {
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -113,26 +118,40 @@ export default function Home() {
       });
       return;
     }
-
+  
     setIsTranscribing(true);
     setAiTranscription('');
     setTranscriptionError(null);
-
-    try {
-      const result = await transcribeWithHuggingFace({ audioDataUri: audioUrl });
-      setAiTranscription(result);
-    } catch (error: any) {
-        console.error('Error in transcription flow:', error);
-        const errorMessage = error.message || "An unknown error occurred during transcription.";
-        setTranscriptionError(errorMessage);
+  
+    const reader = new FileReader();
+    reader.readAsDataURL(audioBlob);
+    reader.onloadend = async () => {
+      const base64Audio = reader.result as string;
+      try {
+        const result = await transcribeWithHuggingFace({ audioDataUri: base64Audio });
+        setAiTranscription(result);
+      } catch (error: any) {
+          console.error('Error in transcription flow:', error);
+          const errorMessage = error.message || "An unknown error occurred during transcription.";
+          setTranscriptionError(errorMessage);
+          toast({
+            variant: "destructive",
+            title: "Transcription Failed",
+            description: `There was a problem communicating with the AI model. ${errorMessage}`,
+          });
+      } finally {
+        setIsTranscribing(false);
+      }
+    };
+    reader.onerror = () => {
+        console.error("FileReader error");
         toast({
-          variant: "destructive",
-          title: "Transcription Failed",
-          description: `There was a problem communicating with the AI model. ${errorMessage}`,
+            variant: "destructive",
+            title: "File Reading Error",
+            description: "Could not read the recorded audio data.",
         });
-    } finally {
-      setIsTranscribing(false);
-    }
+        setIsTranscribing(false);
+    };
   };
   
   const handlePlayRecording = () => {

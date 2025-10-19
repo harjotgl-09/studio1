@@ -21,12 +21,16 @@ export const VoiceScribeClient: FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<any | null>(null);
+  const finalTranscriptRef = useRef<string>("");
   const { toast } = useToast();
 
   const [SpeechRecognition, setSpeechRecognition] = useState<any>(null);
 
   useEffect(() => {
-    setSpeechRecognition(() => window.SpeechRecognition || window.webkitSpeechRecognition);
+    const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (sr) {
+        setSpeechRecognition(() => sr);
+    }
   }, []);
 
   useEffect(() => {
@@ -51,6 +55,11 @@ export const VoiceScribeClient: FC = () => {
       return;
     }
 
+    setStatus("recording");
+    finalTranscriptRef.current = ""; 
+    setRawTranscription("");
+    setImprovedTranscription("");
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
@@ -60,17 +69,16 @@ export const VoiceScribeClient: FC = () => {
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
 
-      let finalTranscript = '';
       recognitionRef.current.onresult = (event: any) => {
         let interimTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+            finalTranscriptRef.current += event.results[i][0].transcript + ' ';
           } else {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        setRawTranscription(finalTranscript + interimTranscript);
+        setRawTranscription(finalTranscriptRef.current + interimTranscript);
       };
 
       recognitionRef.current.onerror = (event: any) => {
@@ -107,12 +115,12 @@ export const VoiceScribeClient: FC = () => {
           const base64DataUri = reader.result as string;
           setAudioDataUri(base64DataUri);
           setStatus("success");
+          setRawTranscription(finalTranscriptRef.current.trim());
         };
       };
 
       mediaRecorderRef.current.start();
       recognitionRef.current.start();
-      setStatus("recording");
     } catch (error) {
       console.error("Failed to get microphone access:", error);
       toast({
@@ -120,13 +128,13 @@ export const VoiceScribeClient: FC = () => {
         title: "Microphone Access Denied",
         description: "Please allow microphone access in your browser settings to record audio.",
       });
+      setStatus("initial");
     }
   };
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
     }
     if (recognitionRef.current) {
         recognitionRef.current.stop();
@@ -157,6 +165,7 @@ export const VoiceScribeClient: FC = () => {
 
   const handlePlayTranscription = (text: string) => {
     if ('speechSynthesis' in window && text) {
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       window.speechSynthesis.speak(utterance);
     }
@@ -174,6 +183,10 @@ export const VoiceScribeClient: FC = () => {
     setImprovedTranscription("");
     setAudioURL("");
     setAudioDataUri("");
+    finalTranscriptRef.current = "";
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
   };
 
 
@@ -292,3 +305,5 @@ export const VoiceScribeClient: FC = () => {
     </div>
   );
 };
+
+    

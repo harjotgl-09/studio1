@@ -224,7 +224,7 @@ export default function Home() {
                         <Play />
                     </Button>
                     <p className="text-sm text-muted-foreground flex-1 text-center">
-                        Your recording is ready
+                        Your recording is ready to be played back or transcribed.
                     </p>
                 </div>
               )}

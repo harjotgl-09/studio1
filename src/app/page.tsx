@@ -50,7 +50,18 @@ export default function Home() {
         console.warn("SpeechRecognition API not supported in this browser.");
       }
     }
-  }, []);
+
+    // Cleanup audio object on component unmount
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
 
 
   const handleStartRecording = async () => {
@@ -65,9 +76,8 @@ export default function Home() {
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setAudioUrl(audioUrl);
-        audioRef.current = new Audio(audioUrl);
+        const newAudioUrl = URL.createObjectURL(audioBlob);
+        setAudioUrl(newAudioUrl);
       };
       
       mediaRecorderRef.current.start();
@@ -75,12 +85,16 @@ export default function Home() {
       setBrowserTranscription('');
       setAiTranscription('');
       setTranscriptionError(null);
+      
+      if(audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
       setAudioUrl(null);
+      
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-
 
       if (recognitionRef.current) {
         recognitionRef.current.start();
@@ -154,13 +168,19 @@ export default function Home() {
   };
   
   const handlePlayRecording = () => {
-    if (audioRef.current) {
-      audioRef.current.play();
+    if (audioUrl) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.play();
     }
   };
 
   const handleReadAloud = (text: string) => {
     if ('speechSynthesis' in window && text) {
+      window.speechSynthesis.cancel(); // Stop any previous speech
       const utterance = new SpeechSynthesisUtterance(text);
       window.speechSynthesis.speak(utterance);
     } else {

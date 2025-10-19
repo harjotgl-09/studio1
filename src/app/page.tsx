@@ -48,16 +48,14 @@ export default function Home() {
         console.warn("SpeechRecognition API not supported in this browser.");
       }
     }
-  }, []);
-
-  useEffect(() => {
-    // Cleanup the object URL when the component unmounts or audioUrl changes
+    
+    // Cleanup object URLs on component unmount
     return () => {
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+        }
     };
-  }, [audioUrl]);
+  }, []);
 
 
   const handleStartRecording = async () => {
@@ -65,6 +63,9 @@ export default function Home() {
     setBrowserTranscription('');
     setAiTranscription('');
     setTranscriptionError(null);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
     setAudioUrl(null); 
 
     try {

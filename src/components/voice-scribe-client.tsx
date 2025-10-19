@@ -1,20 +1,22 @@
 
 "use client";
 
+import { transcribeWithHuggingFace } from "@/ai/flows/transcribe-with-hugging-face";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Copy, LoaderCircle, Mic, Play, RefreshCw, Square, Voicemail } from "lucide-react";
+import { Check, Copy, LoaderCircle, Mic, Play, RefreshCw, Square, Sparkles, Voicemail } from "lucide-react";
 import { useEffect, useRef, useState, type FC } from "react";
 
-type Status = "initial" | "recording" | "processing" | "success" | "error";
+type Status = "initial" | "recording" | "processing" | "success" | "improving" | "error";
 
 export const VoiceScribeClient: FC = () => {
   const [status, setStatus] = useState<Status>("initial");
   const [transcription, setTranscription] = useState<string>("");
   const [audioURL, setAudioURL] = useState<string>("");
   const [isCopied, setIsCopied] = useState(false);
+  const [audioDataUri, setAudioDataUri] = useState<string>('');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -55,8 +57,10 @@ export const VoiceScribeClient: FC = () => {
       return;
     }
 
-    setStatus("recording");
     setTranscription("");
+    setAudioURL("");
+    setAudioDataUri("");
+    setStatus("recording");
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -71,10 +75,9 @@ export const VoiceScribeClient: FC = () => {
 
       recognitionRef.current.onresult = (event: any) => {
         let interimTranscript = '';
-        finalTranscript = ''; // Reset final transcript to rebuild it
-        for (let i = 0; i < event.results.length; ++i) {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+            finalTranscript += event.results[i][0].transcript + ' ';
           } else {
             interimTranscript += event.results[i][0].transcript;
           }
@@ -109,12 +112,21 @@ export const VoiceScribeClient: FC = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const audioUrl = URL.createObjectURL(audioBlob);
         setAudioURL(audioUrl);
-        setStatus("success");
+        
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+            const base64data = reader.result as string;
+            setAudioDataUri(base64data);
+            setStatus("success");
+        };
+
         setTranscription(finalTranscript.trim());
       };
 
       mediaRecorderRef.current.start();
       recognitionRef.current.start();
+      setStatus("recording");
     } catch (error) {
       console.error("Failed to get microphone access:", error);
       toast({
@@ -154,11 +166,29 @@ export const VoiceScribeClient: FC = () => {
     setStatus("initial");
     setTranscription("");
     setAudioURL("");
+    setAudioDataUri("");
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
   };
 
+  const handleImproveTranscription = async () => {
+    if (!audioDataUri) return;
+    setStatus('improving');
+    try {
+      const result = await transcribeWithHuggingFace({ audioDataUri });
+      setTranscription(result.transcription);
+      setStatus('success');
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        variant: 'destructive',
+        title: 'Transcription Improvement Failed',
+        description: e.message || 'Could not improve transcription.',
+      });
+      setStatus('error');
+    }
+  };
 
   const renderContent = () => {
     switch (status) {
@@ -202,13 +232,20 @@ export const VoiceScribeClient: FC = () => {
           </div>
         );
       case "improving":
+        return (
+          <div className="text-center flex flex-col items-center gap-4">
+             <LoaderCircle size={64} className="text-primary animate-spin" />
+             <h2 className="text-2xl font-semibold font-headline">Improving with AI...</h2>
+             <p className="text-muted-foreground">Using the advanced model to refine your transcription.</p>
+          </div>
+        );
       case "success":
         return (
           <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
               <CardTitle className="font-headline">Your Transcription</CardTitle>
               <CardDescription>
-                Review your transcription and play back the audio.
+                Review your transcription, play back the audio, or improve it with AI.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -232,6 +269,10 @@ export const VoiceScribeClient: FC = () => {
                 <RefreshCw size={16} className="mr-2" /> Record New
               </Button>
               <div className="flex items-center gap-2">
+                 <Button onClick={handleImproveTranscription}>
+                    <Sparkles className="mr-2" />
+                    Improve with AI
+                </Button>
                 <Button variant="ghost" size="icon" onClick={() => handlePlayTranscription(transcription)} aria-label="Play transcription">
                   <Play />
                 </Button>
@@ -251,5 +292,3 @@ export const VoiceScribeClient: FC = () => {
     </div>
   );
 };
-
-    

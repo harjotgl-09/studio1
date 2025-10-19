@@ -48,14 +48,7 @@ export default function Home() {
         console.warn("SpeechRecognition API not supported in this browser.");
       }
     }
-    
-    // Cleanup object URLs on component unmount
-    return () => {
-        if (audioUrl) {
-            URL.revokeObjectURL(audioUrl);
-        }
-    };
-  }, [audioUrl]);
+  }, []);
 
 
   const handleStartRecording = async () => {
@@ -63,10 +56,7 @@ export default function Home() {
     setBrowserTranscription('');
     setAiTranscription('');
     setTranscriptionError(null);
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null); 
-    }
+    setAudioUrl(null); 
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -79,8 +69,12 @@ export default function Home() {
 
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const newAudioUrl = URL.createObjectURL(audioBlob);
-        setAudioUrl(newAudioUrl);
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64Audio = reader.result as string;
+          setAudioUrl(base64Audio);
+        };
       };
       
       mediaRecorderRef.current.start();
@@ -125,35 +119,18 @@ export default function Home() {
     setTranscriptionError(null);
 
     try {
-      // Fetch blob from URL to ensure it's available
-      const audioBlob = await fetch(audioUrl).then(res => res.blob());
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = async () => {
-        const base64Audio = reader.result as string;
-        try {
-          const result = await transcribeWithHuggingFace({ audioDataUri: base64Audio });
-          setAiTranscription(result);
-        } catch (error: any) {
-           console.error('Error in transcription flow:', error);
-           const errorMessage = error.message || "An unknown error occurred during transcription.";
-           setTranscriptionError(errorMessage);
-           toast({
-             variant: "destructive",
-             title: "Transcription Failed",
-             description: `There was a problem communicating with the AI model. ${errorMessage}`,
-           });
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-    } catch (error) {
-      console.error('Error during transcription preparation:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to prepare audio for transcription.",
-      });
+      const result = await transcribeWithHuggingFace({ audioDataUri: audioUrl });
+      setAiTranscription(result);
+    } catch (error: any) {
+        console.error('Error in transcription flow:', error);
+        const errorMessage = error.message || "An unknown error occurred during transcription.";
+        setTranscriptionError(errorMessage);
+        toast({
+          variant: "destructive",
+          title: "Transcription Failed",
+          description: `There was a problem communicating with the AI model. ${errorMessage}`,
+        });
+    } finally {
       setIsTranscribing(false);
     }
   };

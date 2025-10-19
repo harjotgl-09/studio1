@@ -79,6 +79,19 @@ export default function Home() {
         }
         const newAudioUrl = URL.createObjectURL(audioBlob);
         setAudioUrl(newAudioUrl);
+        
+        if (audioPlayerRef.current) {
+          const audioPlayer = audioPlayerRef.current;
+          
+          const onCanPlay = () => {
+            setIsAudioPlayable(true);
+            audioPlayer.removeEventListener('canplay', onCanPlay);
+          };
+
+          audioPlayer.addEventListener('canplay', onCanPlay);
+          audioPlayer.src = newAudioUrl;
+          audioPlayer.load();
+        }
       };
       
       mediaRecorderRef.current.start();
@@ -226,15 +239,12 @@ export default function Home() {
                     <div className="w-full bg-muted rounded-full h-2 flex items-center justify-center">
                        <p className="text-sm text-muted-foreground">{isAudioPlayable ? "Your recording is ready" : "Loading recording..."}</p>
                     </div>
-                    <audio 
-                      ref={audioPlayerRef} 
-                      src={audioUrl} 
-                      onCanPlay={() => setIsAudioPlayable(true)}
-                      onEmptied={() => setIsAudioPlayable(false)}
-                      className="hidden"
-                    />
                 </div>
               )}
+              <audio 
+                  ref={audioPlayerRef}
+                  className="hidden"
+              />
 
               <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>

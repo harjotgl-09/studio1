@@ -4,9 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Mic, Loader2, Ear, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/header';
-import { transcribeAudio } from '@/ai/flows/transcribe-audio';
-import { diagnoseEmotion, Emotion } from '@/ai/flows/diagnose-emotion';
-import { cn } from '@/lib/utils';
+import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
 import { AudioPlayer } from '@/components/AudioPlayer';
 
 export default function Home() {
@@ -15,26 +13,18 @@ export default function Home() {
   const [aiTranscription, setAiTranscription] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
-  const [currentEmotion, setCurrentEmotion] = useState<Emotion>('Neutral');
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   const { toast } = useToast();
 
-  const emotionColors: Record<Emotion, { ring: string; background: string }> = {
-    Neutral: { ring: 'ring-purple-500/30', background: 'bg-purple-500 hover:bg-purple-600' },
-    Sadness: { ring: 'ring-blue-500/30', background: 'bg-blue-500 hover:bg-blue-600' },
-    Joy: { ring: 'ring-yellow-500/30', background: 'bg-yellow-500 hover:bg-yellow-600' },
-    Anger: { ring: 'ring-red-500/30', background: 'bg-red-500 hover:bg-red-600' },
-  };
-  
-  const handleTranscribeAndDiagnose = async (audioDataUrl: string) => {
+  const handleTranscribe = async (audioDataUrl: string) => {
     if (!audioDataUrl) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'No audio recorded to process.',
+        description: 'No audio recorded to transcribe.',
       });
       return;
     }
@@ -42,24 +32,17 @@ export default function Home() {
     setIsTranscribing(true);
     setAiTranscription('');
     setTranscriptionError(null);
-    setCurrentEmotion('Neutral');
   
     try {
-      const transcription = await transcribeAudio({ audioDataUri: audioDataUrl });
+      const transcription = await transcribeWithHuggingFace({ audioDataUri: audioDataUrl });
       setAiTranscription(transcription);
-
-      if (transcription) {
-        const emotion = await diagnoseEmotion({ text: transcription });
-        setCurrentEmotion(emotion);
-      }
-
     } catch (error: any) {
-        console.error('Error in processing flow:', error);
-        const errorMessage = error.message || "An unknown error occurred.";
+        console.error('Error transcribing:', error);
+        const errorMessage = error.message || "An unknown error occurred during transcription.";
         setTranscriptionError(errorMessage);
         toast({
           variant: "destructive",
-          title: "Processing Failed",
+          title: "Transcription Failed",
           description: `There was a problem communicating with the AI model. ${errorMessage}`,
         });
     } finally {
@@ -72,7 +55,6 @@ export default function Home() {
     setIsRecording(true);
     setAiTranscription('');
     setTranscriptionError(null);
-    setCurrentEmotion('Neutral');
     audioChunksRef.current = [];
 
     try {
@@ -97,7 +79,7 @@ export default function Home() {
         reader.onloadend = () => {
             const base64Audio = reader.result as string;
             setAudioUrl(base64Audio);
-            handleTranscribeAndDiagnose(base64Audio);
+            handleTranscribe(base64Audio);
         };
         reader.onerror = (error) => {
             console.error("FileReader error:", error);
@@ -169,29 +151,17 @@ export default function Home() {
       <Header />
       <main className="flex-1 flex flex-col items-center justify-between p-6 bg-background">
         <div className="w-full flex-1 flex flex-col items-center justify-center">
-          <div className="relative flex items-center justify-center">
-            {isRecording && (
-              <>
-                <div className={cn("absolute w-64 h-64 rounded-full animate-pulse", emotionColors[currentEmotion].background, "opacity-20")}></div>
-                <div className={cn("absolute w-80 h-80 rounded-full animate-pulse delay-75", emotionColors[currentEmotion].background, "opacity-10")}></div>
-                 <div className={cn("absolute w-96 h-96 rounded-full animate-pulse delay-150", emotionColors[currentEmotion].background, "opacity-5")}></div>
-              </>
-            )}
-            <Button
-              onClick={isRecording ? handleStopRecording : handleStartRecording}
-              className={cn(
-                "w-48 h-48 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative",
-                isRecording 
-                  ? emotionColors['Anger'].background // Use a consistent stop color
-                  : emotionColors[currentEmotion].background,
-                "ring-8",
-                 isRecording ? 'ring-red-500/30' : emotionColors[currentEmotion].ring
-              )}
-              disabled={isTranscribing}
-            >
-              {isTranscribing ? <Loader2 className="w-20 h-20 text-primary-foreground animate-spin" /> : <Mic className="w-20 h-20 text-primary-foreground" />}
-            </Button>
-          </div>
+          <Button
+            onClick={isRecording ? handleStopRecording : handleStartRecording}
+            className={`w-48 h-48 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ${
+              isRecording
+                ? 'bg-red-500 hover:bg-red-600 ring-8 ring-red-500/30'
+                : 'bg-primary hover:bg-primary/90 ring-8 ring-primary/30'
+            }`}
+            disabled={isTranscribing}
+          >
+            {isTranscribing ? <Loader2 className="w-20 h-20 text-primary-foreground animate-spin" /> : <Mic className="w-20 h-20 text-primary-foreground" />}
+          </Button>
           <p className="mt-8 text-lg text-muted-foreground">
             {isRecording ? 'Recording...' : isTranscribing ? 'Transcribing...' : 'Tap to speak'}
           </p>

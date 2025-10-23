@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Mic, Loader2, Ear, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/header';
-import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
+import { transcribeAudio } from '@/ai/flows/transcribe-audio';
 import { diagnoseEmotion, Emotion } from '@/ai/flows/diagnose-emotion';
 import { cn } from '@/lib/utils';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -45,7 +45,7 @@ export default function Home() {
     setCurrentEmotion('Neutral');
   
     try {
-      const transcription = await transcribeWithHuggingFace({ audioDataUri: audioDataUrl });
+      const transcription = await transcribeAudio({ audioDataUri: audioDataUrl });
       setAiTranscription(transcription);
 
       if (transcription) {

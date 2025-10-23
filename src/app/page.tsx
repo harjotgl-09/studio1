@@ -67,7 +67,7 @@ export default function Home() {
       
       if (!supportedMimeType) {
         console.warn("Supported MIME type not found, falling back to default");
-        supportedMimeType = ''; // Let the browser decide
+        supportedMimeType = 'audio/webm'; // fallback
       }
 
       const options = supportedMimeType ? { mimeType: supportedMimeType } : {};
@@ -165,8 +165,8 @@ export default function Home() {
         <div className="w-full flex flex-col gap-4">
           {audioUrl && <AudioPlayer src={audioUrl} />}
           <div className="relative w-full">
-            <div className="w-full min-h-[56px] rounded-full bg-secondary text-secondary-foreground px-6 py-4 flex items-center justify-between gap-4">
-              <span className="flex-1 text-left truncate">
+            <div className="w-full min-h-[56px] rounded-2xl bg-secondary text-secondary-foreground px-6 py-4 flex items-center">
+              <span className="flex-1 text-left whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
                 {isTranscribing && 'Transcribing...'}
                 {transcriptionError && <span className='text-destructive'>Error transcribing.</span>}
                 {aiTranscription || (!isTranscribing && !transcriptionError && 'Clear Speech will appear here...')}

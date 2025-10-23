@@ -44,12 +44,11 @@ export async function transcribeWithHuggingFace(
     
     const result = await response.json();
     
-    // Log the full response to see its structure
-    console.log("Hugging Face API Response:", JSON.stringify(result, null, 2));
-
     if (result && result.text) {
         return result.text;
     } else {
+      // Log the unexpected response structure
+      console.error("Unexpected Hugging Face API Response structure:", JSON.stringify(result, null, 2));
       throw new Error('Transcription not found in the expected format.');
     }
 

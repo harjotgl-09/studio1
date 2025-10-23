@@ -1,13 +1,13 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Loader2, Play, Ear, AppWindow } from 'lucide-react';
+import { Mic, Loader2, Ear, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/header';
 import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
+import { diagnoseEmotion, Emotion } from '@/ai/flows/diagnose-emotion';
 import { cn } from '@/lib/utils';
 import { AudioPlayer } from '@/components/AudioPlayer';
-
 
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
@@ -15,18 +15,26 @@ export default function Home() {
   const [aiTranscription, setAiTranscription] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [currentEmotion, setCurrentEmotion] = useState<Emotion>('Neutral');
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   const { toast } = useToast();
 
-  const handleTranscribe = async (audioDataUrl: string) => {
+  const emotionColors: Record<Emotion, { ring: string; background: string }> = {
+    Neutral: { ring: 'ring-purple-500/30', background: 'bg-purple-500 hover:bg-purple-600' },
+    Sadness: { ring: 'ring-blue-500/30', background: 'bg-blue-500 hover:bg-blue-600' },
+    Joy: { ring: 'ring-yellow-500/30', background: 'bg-yellow-500 hover:bg-yellow-600' },
+    Anger: { ring: 'ring-red-500/30', background: 'bg-red-500 hover:bg-red-600' },
+  };
+  
+  const handleTranscribeAndDiagnose = async (audioDataUrl: string) => {
     if (!audioDataUrl) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'No audio recorded to transcribe.',
+        description: 'No audio recorded to process.',
       });
       return;
     }
@@ -34,17 +42,24 @@ export default function Home() {
     setIsTranscribing(true);
     setAiTranscription('');
     setTranscriptionError(null);
+    setCurrentEmotion('Neutral');
   
     try {
-      const result = await transcribeWithHuggingFace({ audioDataUri: audioDataUrl });
-      setAiTranscription(result);
+      const transcription = await transcribeWithHuggingFace({ audioDataUri: audioDataUrl });
+      setAiTranscription(transcription);
+
+      if (transcription) {
+        const emotion = await diagnoseEmotion({ text: transcription });
+        setCurrentEmotion(emotion);
+      }
+
     } catch (error: any) {
-        console.error('Error in transcription flow:', error);
-        const errorMessage = error.message || "An unknown error occurred during transcription.";
+        console.error('Error in processing flow:', error);
+        const errorMessage = error.message || "An unknown error occurred.";
         setTranscriptionError(errorMessage);
         toast({
           variant: "destructive",
-          title: "Transcription Failed",
+          title: "Processing Failed",
           description: `There was a problem communicating with the AI model. ${errorMessage}`,
         });
     } finally {
@@ -57,20 +72,16 @@ export default function Home() {
     setIsRecording(true);
     setAiTranscription('');
     setTranscriptionError(null);
+    setCurrentEmotion('Neutral');
     audioChunksRef.current = [];
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       const mimeTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
-      let supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+      const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
+      const options = { mimeType: supportedMimeType };
       
-      if (!supportedMimeType) {
-        console.warn("Supported MIME type not found, falling back to default");
-        supportedMimeType = 'audio/webm'; // fallback
-      }
-
-      const options = supportedMimeType ? { mimeType: supportedMimeType } : {};
       mediaRecorderRef.current = new MediaRecorder(stream, options);
       
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -80,17 +91,16 @@ export default function Home() {
       };
       
       mediaRecorderRef.current.onstop = () => {
-        const finalMimeType = mediaRecorderRef.current?.mimeType || supportedMimeType || 'audio/webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
+        const audioBlob = new Blob(audioChunksRef.current, { type: supportedMimeType });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
             const base64Audio = reader.result as string;
             setAudioUrl(base64Audio);
-            handleTranscribe(base64Audio);
+            handleTranscribeAndDiagnose(base64Audio);
         };
-        reader.onerror = () => {
-            console.error("FileReader error");
+        reader.onerror = (error) => {
+            console.error("FileReader error:", error);
             toast({
                 variant: "destructive",
                 title: "File Reading Error",
@@ -135,8 +145,23 @@ export default function Home() {
       });
     }
   };
+  
+  const handleCopyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        title: "Copied!",
+        description: "The transcription has been copied to your clipboard.",
+      });
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+      toast({
+        variant: 'destructive',
+        title: "Copy Failed",
+        description: "Could not copy text to the clipboard.",
+      });
+    });
+  };
 
-  const hasRecording = !!audioUrl;
   const hasTranscription = !!aiTranscription;
 
   return (
@@ -144,26 +169,37 @@ export default function Home() {
       <Header />
       <main className="flex-1 flex flex-col items-center justify-between p-6 bg-background">
         <div className="w-full flex-1 flex flex-col items-center justify-center">
-          <Button
-            onClick={isRecording ? handleStopRecording : handleStartRecording}
-            className={cn(
-              "w-48 h-48 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center",
-              isRecording 
-                ? "bg-red-500 hover:bg-red-600 animate-pulse" 
-                : "bg-primary hover:bg-primary/90",
-              "ring-8 ring-primary/20"
+          <div className="relative flex items-center justify-center">
+            {isRecording && (
+              <>
+                <div className={cn("absolute w-64 h-64 rounded-full animate-pulse", emotionColors[currentEmotion].background, "opacity-20")}></div>
+                <div className={cn("absolute w-80 h-80 rounded-full animate-pulse delay-75", emotionColors[currentEmotion].background, "opacity-10")}></div>
+                 <div className={cn("absolute w-96 h-96 rounded-full animate-pulse delay-150", emotionColors[currentEmotion].background, "opacity-5")}></div>
+              </>
             )}
-            disabled={isTranscribing}
-          >
-            {isTranscribing ? <Loader2 className="w-20 h-20 text-primary-foreground animate-spin" /> : <Mic className="w-20 h-20 text-primary-foreground" />}
-          </Button>
-          <p className="mt-6 text-lg text-muted-foreground">
+            <Button
+              onClick={isRecording ? handleStopRecording : handleStartRecording}
+              className={cn(
+                "w-48 h-48 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative",
+                isRecording 
+                  ? emotionColors['Anger'].background // Use a consistent stop color
+                  : emotionColors[currentEmotion].background,
+                "ring-8",
+                 isRecording ? 'ring-red-500/30' : emotionColors[currentEmotion].ring
+              )}
+              disabled={isTranscribing}
+            >
+              {isTranscribing ? <Loader2 className="w-20 h-20 text-primary-foreground animate-spin" /> : <Mic className="w-20 h-20 text-primary-foreground" />}
+            </Button>
+          </div>
+          <p className="mt-8 text-lg text-muted-foreground">
             {isRecording ? 'Recording...' : isTranscribing ? 'Transcribing...' : 'Tap to speak'}
           </p>
         </div>
 
         <div className="w-full flex flex-col gap-4">
-          {audioUrl && <AudioPlayer src={audioUrl} />}
+          {audioUrl && !isTranscribing && <AudioPlayer src={audioUrl} />}
+          
           <div className="relative w-full">
             <div className="w-full min-h-[56px] rounded-2xl bg-secondary text-secondary-foreground px-6 py-4 flex items-center">
               <span className="flex-1 text-left whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
@@ -174,19 +210,25 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-             <Button variant="ghost" size="icon" className="rounded-full"><AppWindow /></Button>
-            <div className='flex items-center gap-2 p-1 bg-secondary rounded-full'>
-              <Button 
-                variant={hasTranscription ? "default" : "secondary"}
-                size="icon" 
-                className="rounded-full"
-                onClick={() => handleReadAloud(aiTranscription)}
-                disabled={!hasTranscription}
-              >
-                <Ear />
-              </Button>
-            </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-full"
+              onClick={() => handleCopyToClipboard(aiTranscription)}
+              disabled={!hasTranscription}
+            >
+              <Copy />
+            </Button>
+            <Button 
+              variant={hasTranscription ? "default" : "secondary"}
+              size="icon" 
+              className="rounded-full"
+              onClick={() => handleReadAloud(aiTranscription)}
+              disabled={!hasTranscription}
+            >
+              <Ear />
+            </Button>
           </div>
         </div>
       </main>

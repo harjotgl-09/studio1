@@ -14,6 +14,12 @@ export async function transcribeWithHuggingFace(
 ): Promise<string> {
   const { audioDataUri } = TranscribeInputSchema.parse(input);
   
+  // Extract mime type and base64 data from data URI
+  const mimeTypeMatch = audioDataUri.match(/data:(.*?);base64,/);
+  if (!mimeTypeMatch) {
+    throw new Error("Invalid audio data URI format.");
+  }
+  const mimeType = mimeTypeMatch[1];
   const base64Data = audioDataUri.split(',')[1];
   const audioBlob = Buffer.from(base64Data, 'base64');
 
@@ -25,7 +31,10 @@ export async function transcribeWithHuggingFace(
   const response = await fetch(
     "https://api-inference.huggingface.co/models/openai/whisper-large-v3",
     {
-      headers: { Authorization: `Bearer ${hfToken}` },
+      headers: { 
+        Authorization: `Bearer ${hfToken}`,
+        "Content-Type": mimeType,
+      },
       method: "POST",
       body: audioBlob,
     }

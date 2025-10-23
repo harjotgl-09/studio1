@@ -1,11 +1,12 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Square, Loader2, Play, AlertTriangle, Volume2, Send, Settings, Ear, AppWindow } from 'lucide-react';
+import { Mic, Loader2, Play, Ear, AppWindow } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Header } from '@/components/header';
 import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
 import { cn } from '@/lib/utils';
+import { AudioPlayer } from '@/components/AudioPlayer';
 
 
 export default function Home() {
@@ -20,6 +21,37 @@ export default function Home() {
 
   const { toast } = useToast();
 
+  const handleTranscribe = async (audioDataUrl: string) => {
+    if (!audioDataUrl) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No audio recorded to transcribe.',
+      });
+      return;
+    }
+  
+    setIsTranscribing(true);
+    setAiTranscription('');
+    setTranscriptionError(null);
+  
+    try {
+      const result = await transcribeWithHuggingFace({ audioDataUri: audioDataUrl });
+      setAiTranscription(result);
+    } catch (error: any) {
+        console.error('Error in transcription flow:', error);
+        const errorMessage = error.message || "An unknown error occurred during transcription.";
+        setTranscriptionError(errorMessage);
+        toast({
+          variant: "destructive",
+          title: "Transcription Failed",
+          description: `There was a problem communicating with the AI model. ${errorMessage}`,
+        });
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
   const handleStartRecording = async () => {
     setAudioUrl(null);
     setIsRecording(true);
@@ -31,13 +63,14 @@ export default function Home() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       const mimeTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
-      const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+      let supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
       
       if (!supportedMimeType) {
-        throw new Error("No supported MIME type found for MediaRecorder");
+        console.warn("Supported MIME type not found, falling back to default");
+        supportedMimeType = ''; // Let the browser decide
       }
 
-      const options = { mimeType: supportedMimeType };
+      const options = supportedMimeType ? { mimeType: supportedMimeType } : {};
       mediaRecorderRef.current = new MediaRecorder(stream, options);
       
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -47,12 +80,14 @@ export default function Home() {
       };
       
       mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: supportedMimeType });
+        const finalMimeType = mediaRecorderRef.current?.mimeType || supportedMimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
             const base64Audio = reader.result as string;
             setAudioUrl(base64Audio);
+            handleTranscribe(base64Audio);
         };
         reader.onerror = () => {
             console.error("FileReader error");
@@ -87,51 +122,6 @@ export default function Home() {
     }
   };
   
-  const handleTranscribe = async () => {
-    if (!audioUrl) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No audio recorded to transcribe.',
-      });
-      return;
-    }
-  
-    setIsTranscribing(true);
-    setAiTranscription('');
-    setTranscriptionError(null);
-  
-    try {
-      const result = await transcribeWithHuggingFace({ audioDataUri: audioUrl });
-      setAiTranscription(result);
-    } catch (error: any) {
-        console.error('Error in transcription flow:', error);
-        const errorMessage = error.message || "An unknown error occurred during transcription.";
-        setTranscriptionError(errorMessage);
-        toast({
-          variant: "destructive",
-          title: "Transcription Failed",
-          description: `There was a problem communicating with the AI model. ${errorMessage}`,
-        });
-    } finally {
-      setIsTranscribing(false);
-    }
-  };
-  
-  const handlePlayRecording = () => {
-    if (audioUrl) {
-        const audio = new Audio(audioUrl);
-        audio.play().catch(e => {
-            console.error("Playback error:", e)
-            toast({
-                variant: 'destructive',
-                title: 'Playback Error',
-                description: 'Could not play the recorded audio.',
-            });
-        });
-    }
-  };
-
   const handleReadAloud = (text: string) => {
     if ('speechSynthesis' in window && text) {
       window.speechSynthesis.cancel();
@@ -163,15 +153,17 @@ export default function Home() {
                 : "bg-primary hover:bg-primary/90",
               "ring-8 ring-primary/20"
             )}
+            disabled={isTranscribing}
           >
-            <Mic className="w-20 h-20 text-primary-foreground" />
+            {isTranscribing ? <Loader2 className="w-20 h-20 text-primary-foreground animate-spin" /> : <Mic className="w-20 h-20 text-primary-foreground" />}
           </Button>
           <p className="mt-6 text-lg text-muted-foreground">
-            {isRecording ? 'Recording...' : 'Tap to speak'}
+            {isRecording ? 'Recording...' : isTranscribing ? 'Transcribing...' : 'Tap to speak'}
           </p>
         </div>
 
         <div className="w-full flex flex-col gap-4">
+          {audioUrl && <AudioPlayer src={audioUrl} />}
           <div className="relative w-full">
             <div className="w-full min-h-[56px] rounded-full bg-secondary text-secondary-foreground px-6 py-4 flex items-center justify-between gap-4">
               <span className="flex-1 text-left truncate">
@@ -179,30 +171,12 @@ export default function Home() {
                 {transcriptionError && <span className='text-destructive'>Error transcribing.</span>}
                 {aiTranscription || (!isTranscribing && !transcriptionError && 'Clear Speech will appear here...')}
               </span>
-               <Button size="icon" className="rounded-full bg-primary" onClick={handleTranscribe} disabled={!hasRecording || isTranscribing}>
-                  {isTranscribing ? <Loader2 className="animate-spin"/> : <Send />}
-                </Button>
             </div>
-          </div>
-
-          <div className="flex justify-center gap-2">
-              <Button variant="outline" className="rounded-full" disabled={!hasRecording}>👍 Yes</Button>
-              <Button variant="outline" className="rounded-full" disabled={!hasRecording}>👎 No</Button>
-              <Button variant="outline" className="rounded-full" disabled={!hasRecording}>😍 Thank You</Button>
           </div>
 
           <div className="flex items-center justify-between gap-4">
              <Button variant="ghost" size="icon" className="rounded-full"><AppWindow /></Button>
             <div className='flex items-center gap-2 p-1 bg-secondary rounded-full'>
-              <Button 
-                variant={hasRecording ? "default" : "secondary"}
-                size="icon" 
-                className="rounded-full" 
-                onClick={handlePlayRecording}
-                disabled={!hasRecording}
-              >
-                <Play />
-              </Button>
               <Button 
                 variant={hasTranscription ? "default" : "secondary"}
                 size="icon" 

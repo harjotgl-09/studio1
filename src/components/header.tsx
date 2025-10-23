@@ -10,10 +10,8 @@ export const Header: FC = () => {
         <div></div>
         <h1 className="text-3xl font-bold text-primary tracking-tighter">SpeakIn'</h1>
         <Link href="/settings" passHref>
-          <Button variant="ghost" size="icon" className="rounded-full" asChild>
-            <a>
-              <Settings className="w-6 h-6 text-muted-foreground" />
-            </a>
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <Settings className="w-6 h-6 text-muted-foreground" />
           </Button>
         </Link>
       </div>

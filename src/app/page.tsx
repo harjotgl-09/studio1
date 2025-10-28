@@ -157,17 +157,21 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
         <div className="flex-1 flex items-center justify-center">
-          <Button
-            onClick={handleMicClick}
-            className={`w-40 h-40 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ${
-              isRecording
-                ? 'bg-red-500 hover:bg-red-600 ring-8 ring-red-500/30'
-                : 'bg-primary hover:bg-primary/90 ring-8 ring-primary/30'
-            }`}
-            disabled={isTranscribing}
+          <div
+            className={`w-40 h-40 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ring-8`}
+            style={{
+                backgroundColor: isRecording ? '#EF4444' : '#B299E4',
+                ringColor: isRecording ? 'rgba(239, 68, 68, 0.3)' : '#9274D1',
+            }}
           >
-            {isTranscribing ? <Loader2 className="w-16 h-16 text-primary-foreground animate-spin" /> : <Mic className="w-16 h-16 text-primary-foreground" />}
-          </Button>
+            <Button
+              onClick={handleMicClick}
+              className={`w-full h-full rounded-full flex items-center justify-center bg-transparent hover:bg-transparent`}
+              disabled={isTranscribing}
+            >
+              {isTranscribing ? <Loader2 className="w-16 h-16 text-primary-foreground animate-spin" /> : <Mic className="w-16 h-16 text-primary-foreground" />}
+            </Button>
+          </div>
         </div>
 
         <div className="w-full space-y-4">

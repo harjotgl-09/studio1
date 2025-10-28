@@ -158,11 +158,7 @@ export default function Home() {
       <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
         <div className="flex-1 flex items-center justify-center">
           <div
-            className={`w-40 h-40 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ring-8`}
-            style={{
-                backgroundColor: isRecording ? '#EF4444' : '#B299E4',
-                ringColor: isRecording ? 'rgba(239, 68, 68, 0.3)' : '#9274D1',
-            }}
+            className={`w-40 h-40 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ${isRecording ? 'bg-red-500 ring-8 ring-red-500/30' : 'bg-primary ring-8 ring-primary/30'}`}
           >
             <Button
               onClick={handleMicClick}

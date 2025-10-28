@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -10,10 +10,15 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 export default function PersonalizePage() {
+  const [isClient, setIsClient] = useState(false);
   const [incorrectWord, setIncorrectWord] = useState('');
   const [correctWord, setCorrectWord] = useState('');
   const { toast } = useToast();
   const router = useRouter();
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleAddCorrection = () => {
     if (!incorrectWord || !correctWord) {
@@ -35,6 +40,10 @@ export default function PersonalizePage() {
     setCorrectWord('');
     router.push('/settings');
   };
+
+  if (!isClient) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">

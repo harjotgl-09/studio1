@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ export default function PersonalizePage() {
   const [incorrectWord, setIncorrectWord] = useState('');
   const [correctWord, setCorrectWord] = useState('');
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleAddCorrection = () => {
     if (!incorrectWord || !correctWord) {
@@ -31,6 +33,7 @@ export default function PersonalizePage() {
     });
     setIncorrectWord('');
     setCorrectWord('');
+    router.push('/settings');
   };
 
   return (
@@ -54,7 +57,7 @@ export default function PersonalizePage() {
             <Label htmlFor="incorrect-word" className="text-lg">Incorrect Transcription</Label>
             <Input
               id="incorrect-word"
-              placeholder="e.g., 'voice scribe'"
+              placeholder="e.g., 'wader'"
               value={incorrectWord}
               onChange={(e) => setIncorrectWord(e.target.value)}
               className="rounded-lg h-12 px-4"
@@ -64,7 +67,7 @@ export default function PersonalizePage() {
             <Label htmlFor="correct-word" className="text-lg">Correct Word/Phrase</Label>
             <Input
               id="correct-word"
-              placeholder="e.g., 'SpeakIn'"
+              placeholder="e.g., 'water'"
               value={correctWord}
               onChange={(e) => setCorrectWord(e.target.value)}
               className="rounded-lg h-12 px-4"

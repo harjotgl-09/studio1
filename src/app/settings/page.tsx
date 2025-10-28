@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -13,13 +13,46 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+
+
+type Emotion = 'Neutral' | 'Joy' | 'Anger' | 'Calm' | 'Sad';
+type Color = 'Purple' | 'Yellow' | 'Red' | 'Green' | 'Blue';
+
+const colorMap: Record<Color, string> = {
+  Purple: 'bg-purple-500',
+  Yellow: 'bg-yellow-500',
+  Red: 'bg-red-500',
+  Green: 'bg-green-500',
+  Blue: 'bg-blue-500',
+};
+
+const emotionData: { emotion: Emotion; defaultColor: Color }[] = [
+  { emotion: 'Neutral', defaultColor: 'Purple' },
+  { emotion: 'Joy', defaultColor: 'Yellow' },
+  { emotion: 'Anger', defaultColor: 'Red' },
+  { emotion: 'Calm', defaultColor: 'Green' },
+  { emotion: 'Sad', defaultColor: 'Blue' },
+];
 
 export default function SettingsPage() {
   const [name, setName] = useState('');
   const [age, setAge] = useState('28');
   const [gender, setGender] = useState('');
-  const [email, setEmail] = useState('sarah.johnson@email.com');
+  const [email, setEmail] = useState('jane.doe@email.com');
+  const [emotionColors, setEmotionColors] = useState<Record<Emotion, Color>>(
+    emotionData.reduce((acc, item) => {
+      acc[item.emotion] = item.defaultColor;
+      return acc;
+    }, {} as Record<Emotion, Color>)
+  );
+  const [micAccess, setMicAccess] = useState(true);
 
+  const handleColorChange = (emotion: Emotion, color: Color) => {
+    setEmotionColors((prev) => ({ ...prev, [emotion]: color }));
+  };
+  
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">
       <header className="flex justify-between items-center p-4">
@@ -30,7 +63,7 @@ export default function SettingsPage() {
         </Link>
       </header>
 
-      <main className="flex-1 flex flex-col px-6 py-2">
+      <main className="flex-1 flex flex-col px-6 py-2 overflow-y-auto">
         <h1 className="text-3xl font-bold mb-8">Settings</h1>
 
         <h2 className="text-2xl font-bold mb-4">User Profile</h2>
@@ -60,7 +93,7 @@ export default function SettingsPage() {
             </SelectContent>
           </Select>
           <Input
-            placeholder="sarah.johnson@email.com"
+            placeholder="jane.doe@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="rounded-full h-12 px-6"
@@ -71,7 +104,51 @@ export default function SettingsPage() {
         <Separator className="my-8 bg-primary h-0.5" />
 
         <h2 className="text-2xl font-bold mb-4">Emotion Colours</h2>
-        {/* Color settings UI will go here */}
+        <div className="space-y-4 mb-8">
+          {emotionData.map(({ emotion }) => (
+            <div key={emotion} className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={cn("w-6 h-6 rounded-full", colorMap[emotionColors[emotion]])} />
+                <span className="text-lg">{emotion}</span>
+              </div>
+              <Select
+                value={emotionColors[emotion]}
+                onValueChange={(value: Color) => handleColorChange(emotion, value)}
+              >
+                <SelectTrigger className="w-32 rounded-full h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(colorMap).map((color) => (
+                    <SelectItem key={color} value={color}>
+                      {color}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+        
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h3 className="text-lg font-semibold">Microphone Access</h3>
+            <p className="text-sm text-muted-foreground">Allow app to access microphone for voice features</p>
+          </div>
+          <Switch checked={micAccess} onCheckedChange={setMicAccess} />
+        </div>
+
+        <div className="flex items-center justify-between mb-8 cursor-pointer">
+          <div>
+            <h3 className="text-lg font-semibold">Personalize</h3>
+            <p className="text-sm text-muted-foreground">Add custom sounds and words</p>
+          </div>
+          <ChevronRight className="w-6 h-6 text-muted-foreground" />
+        </div>
+
+        <Button className="w-full h-14 rounded-full text-lg font-semibold bg-primary hover:bg-primary/90 mt-auto mb-4">
+            Save Changes
+        </Button>
       </main>
     </div>
   );

@@ -26,14 +26,14 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (audioUrl) {
+    if (audioUrl && isClient) {
       handleTranscribe();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioUrl]);
+  }, [audioUrl, isClient]);
 
   const handleStartRecording = async () => {
-    if (isTranscribing) return;
+    if (isTranscribing || !isClient) return;
     setAudioUrl(null);
     setTranscription('');
     setUserInput('Listening...');
@@ -103,7 +103,7 @@ export default function Home() {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
-      setIsTranscribing(true); // Set transcribing state immediately
+      setIsTranscribing(true);
     }
   };
 
@@ -136,7 +136,7 @@ export default function Home() {
   };
   
   const handleSpeakTranscription = () => {
-    if (transcription) {
+    if (transcription && isClient) {
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(transcription);
@@ -165,7 +165,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">
-      <header className="flex justify-end items-center p-4">
+      <header className="flex justify-between items-center p-4">
+        <h1 className="text-xl font-bold text-primary">SpeakIn'</h1>
         <Link href="/settings">
           <Button variant="ghost" size="icon">
             <Settings className="w-6 h-6 text-muted-foreground" />

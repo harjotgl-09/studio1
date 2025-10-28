@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Mic, Send, Loader2, Volume2, Menu, Settings } from 'lucide-react';
@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
 
 export default function Home() {
+  const [isClient, setIsClient] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcription, setTranscription] = useState('');
@@ -18,6 +19,10 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleStartRecording = async () => {
     setAudioUrl(null);
@@ -154,6 +159,10 @@ export default function Home() {
       handleStartRecording();
     }
   };
+  
+  if (!isClient) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">

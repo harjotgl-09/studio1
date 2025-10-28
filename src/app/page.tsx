@@ -1,65 +1,33 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, Loader2, Ear, Copy } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Mic, Send, Loader2, Volume2, Menu, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Header } from '@/components/header';
 import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
-import { AudioPlayer } from '@/components/AudioPlayer';
 
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [aiTranscription, setAiTranscription] = useState('');
+  const [transcription, setTranscription] = useState('');
+  const [userInput, setUserInput] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
-
-  const handleTranscribe = async (audioDataUrl: string) => {
-    if (!audioDataUrl) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No audio recorded to transcribe.',
-      });
-      return;
-    }
-  
-    setIsTranscribing(true);
-    setAiTranscription('');
-    setTranscriptionError(null);
-  
-    try {
-      const transcription = await transcribeWithHuggingFace({ audioDataUri: audioDataUrl });
-      setAiTranscription(transcription);
-    } catch (error: any) {
-        console.error('Error transcribing:', error);
-        const errorMessage = error.message || "An unknown error occurred during transcription.";
-        setTranscriptionError(errorMessage);
-        toast({
-          variant: "destructive",
-          title: "Transcription Failed",
-          description: `There was a problem communicating with the AI model. ${errorMessage}`,
-        });
-    } finally {
-      setIsTranscribing(false);
-    }
-  };
 
   const handleStartRecording = async () => {
     setAudioUrl(null);
     setIsRecording(true);
-    setAiTranscription('');
-    setTranscriptionError(null);
+    setTranscription('');
+    setUserInput('Listening...');
     audioChunksRef.current = [];
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
       const mimeTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
       const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
       const options = { mimeType: supportedMimeType };
@@ -77,17 +45,18 @@ export default function Home() {
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
-            const base64Audio = reader.result as string;
-            setAudioUrl(base64Audio);
-            handleTranscribe(base64Audio);
+          const base64Audio = reader.result as string;
+          setAudioUrl(base64Audio);
+          setUserInput('');
         };
         reader.onerror = (error) => {
-            console.error("FileReader error:", error);
-            toast({
-                variant: "destructive",
-                title: "File Reading Error",
-                description: "Could not read the recorded audio data.",
-            });
+          console.error("FileReader error:", error);
+          toast({
+            variant: "destructive",
+            title: "File Reading Error",
+            description: "Could not read the recorded audio data.",
+          });
+          setUserInput('');
         };
       };
 
@@ -96,6 +65,7 @@ export default function Home() {
     } catch (error) {
       console.error('Error starting recording:', error);
       setIsRecording(false);
+      setUserInput('');
       toast({
         variant: "destructive",
         title: "Error",
@@ -107,101 +77,134 @@ export default function Home() {
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-       if (mediaRecorderRef.current?.stream) {
+      if (mediaRecorderRef.current?.stream) {
         mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       }
       setIsRecording(false);
     }
   };
-  
-  const handleReadAloud = (text: string) => {
-    if ('speechSynthesis' in window && text) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      window.speechSynthesis.speak(utterance);
-    } else {
+
+  const handleTranscribe = async () => {
+    if (!audioUrl && !userInput) {
       toast({
         variant: 'destructive',
-        title: 'Unsupported',
-        description: 'Text-to-speech is not supported in your browser or there is no text to read.',
+        title: 'Error',
+        description: 'No audio recorded or text entered.',
       });
+      return;
+    }
+  
+    setIsTranscribing(true);
+    setTranscription('');
+  
+    try {
+      let resultText = userInput;
+      if (audioUrl && !userInput) {
+        resultText = await transcribeWithHuggingFace({ audioDataUri: audioUrl });
+      }
+      setTranscription(resultText);
+      setUserInput(resultText);
+    } catch (error: any) {
+        console.error('Error transcribing:', error);
+        toast({
+          variant: "destructive",
+          title: "Transcription Failed",
+          description: error.message || "There was a problem communicating with the AI model.",
+        });
+    } finally {
+      setIsTranscribing(false);
     }
   };
-  
-  const handleCopyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast({
-        title: "Copied!",
-        description: "The transcription has been copied to your clipboard.",
-      });
-    }).catch(err => {
-      console.error('Failed to copy text: ', err);
-      toast({
-        variant: 'destructive',
-        title: "Copy Failed",
-        description: "Could not copy text to the clipboard.",
-      });
-    });
+
+  const handleReplay = () => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.play();
+    } else if (transcription) {
+      // Read out the transcription
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(transcription);
+        window.speechSynthesis.speak(utterance);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Unsupported',
+          description: 'Text-to-speech is not supported in your browser.',
+        });
+      }
+    }
   };
 
-  const hasTranscription = !!aiTranscription;
+  const handleQuickButton = (text: string) => {
+    setUserInput(text);
+  }
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      handleStopRecording();
+    } else {
+      handleStartRecording();
+    }
+  };
 
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">
-      <Header />
-      <main className="flex-1 flex flex-col items-center justify-between p-6 bg-background">
-        <div className="w-full flex-1 flex flex-col items-center justify-center">
+      <header className="flex justify-end p-4">
+        <Button variant="ghost" size="icon">
+          <Settings className="w-6 h-6 text-muted-foreground" />
+        </Button>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
+        <div className="flex-1 flex items-center justify-center">
           <Button
-            onClick={isRecording ? handleStopRecording : handleStartRecording}
-            className={`w-48 h-48 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ${
+            onClick={handleMicClick}
+            className={`w-40 h-40 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ${
               isRecording
                 ? 'bg-red-500 hover:bg-red-600 ring-8 ring-red-500/30'
                 : 'bg-primary hover:bg-primary/90 ring-8 ring-primary/30'
             }`}
             disabled={isTranscribing}
           >
-            {isTranscribing ? <Loader2 className="w-20 h-20 text-primary-foreground animate-spin" /> : <Mic className="w-20 h-20 text-primary-foreground" />}
+            {isTranscribing ? <Loader2 className="w-16 h-16 text-primary-foreground animate-spin" /> : <Mic className="w-16 h-16 text-primary-foreground" />}
           </Button>
-          <p className="mt-8 text-lg text-muted-foreground">
-            {isRecording ? 'Recording...' : isTranscribing ? 'Transcribing...' : 'Tap to speak'}
-          </p>
         </div>
 
-        <div className="w-full flex flex-col gap-4">
-          {audioUrl && !isTranscribing && <AudioPlayer src={audioUrl} />}
-          
-          <div className="relative w-full">
-            <div className="w-full min-h-[56px] rounded-2xl bg-secondary text-secondary-foreground px-6 py-4 flex items-center">
-              <span className="flex-1 text-left whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
-                {isTranscribing && 'Transcribing...'}
-                {transcriptionError && <span className='text-destructive'>Error transcribing.</span>}
-                {aiTranscription || (!isTranscribing && !transcriptionError && 'Clear Speech will appear here...')}
-              </span>
+        <div className="w-full space-y-4">
+            <div className="relative w-full">
+                <Input
+                placeholder="Listening..."
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                className="w-full rounded-full h-14 pl-6 pr-16 text-lg"
+                disabled={isRecording || isTranscribing}
+                />
+                <Button 
+                    onClick={handleTranscribe}
+                    size="icon" 
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary"
+                    disabled={isTranscribing || (!audioUrl && !userInput) || isRecording}
+                >
+                    <Send className="w-5 h-5" />
+                </Button>
             </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="rounded-full"
-              onClick={() => handleCopyToClipboard(aiTranscription)}
-              disabled={!hasTranscription}
-            >
-              <Copy />
-            </Button>
-            <Button 
-              variant={hasTranscription ? "default" : "secondary"}
-              size="icon" 
-              className="rounded-full"
-              onClick={() => handleReadAloud(aiTranscription)}
-              disabled={!hasTranscription}
-            >
-              <Ear />
-            </Button>
-          </div>
+            <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" className="rounded-full" onClick={() => handleQuickButton('Yes')}>Yes</Button>
+                <Button variant="outline" className="rounded-full" onClick={() => handleQuickButton('No')}>No</Button>
+                <Button variant="outline" className="rounded-full" onClick={() => handleQuickButton('Thank You')}>Thank You</Button>
+            </div>
         </div>
       </main>
+
+      <footer className="flex justify-between items-center p-4">
+        <Button variant="ghost" size="icon">
+            <Menu className="w-6 h-6 text-muted-foreground" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={handleReplay} disabled={!audioUrl && !transcription}>
+            <Volume2 className="w-6 h-6 text-muted-foreground" />
+        </Button>
+      </footer>
+      {audioUrl && <audio ref={audioRef} src={audioUrl} className="hidden" />}
     </div>
   );
 }

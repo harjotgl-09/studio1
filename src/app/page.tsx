@@ -80,7 +80,7 @@ export default function Home() {
         };
       };
 
-      mediaRecorderRef.current.start();
+      mediaRecorderRef.current.start(100); // Start recording with a 100ms timeslice
       
     } catch (error) {
       console.error('Error starting recording:', error);

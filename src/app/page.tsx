@@ -5,8 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Mic, Send, Loader2, Volume2, Menu, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
+import ProtectedPage from '@/components/auth/ProtectedPage';
+import { useAuth, useUser } from '@/firebase';
+import { useRouter } from 'next/navigation';
 
-export default function Home() {
+function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -19,10 +22,21 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
+  const auth = useAuth();
+  const user = useUser();
+  const router = useRouter();
+
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  const handleSignOut = async () => {
+    if (auth) {
+      await auth.signOut();
+      router.push('/login');
+    }
+  };
 
   const handleStartRecording = async () => {
     setAudioUrl(null);
@@ -166,7 +180,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">
-      <header className="flex justify-end p-4">
+      <header className="flex justify-between items-center p-4">
+        <Button variant="ghost" onClick={handleSignOut}>Sign Out</Button>
         <Button variant="ghost" size="icon">
           <Settings className="w-6 h-6 text-muted-foreground" />
         </Button>
@@ -175,7 +190,7 @@ export default function Home() {
       <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
         <div className="flex-1 flex items-center justify-center">
           <div
-            className={`w-40 h-40 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative ${isRecording ? 'bg-red-500 ring-8 ring-red-500/30' : 'bg-primary ring-8 ring-primary/30'}`}
+            className={`w-40 h-40 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center relative bg-primary ring-8 ring-primary/30 ${isRecording ? 'bg-red-500 ring-red-500/30' : ''}`}
           >
             <Button
               onClick={handleMicClick}
@@ -223,5 +238,14 @@ export default function Home() {
       </footer>
       {audioUrl && <audio ref={audioRef} src={audioUrl} className="hidden" />}
     </div>
+  );
+}
+
+
+export default function Home() {
+  return (
+    <ProtectedPage>
+      <HomePage />
+    </ProtectedPage>
   );
 }

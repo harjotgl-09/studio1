@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Mic, Send, Loader2, Volume2, Menu, Settings } from 'lucide-react';
@@ -28,8 +28,13 @@ export default function Home() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'];
-      const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
+      const mimeTypes = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg'];
+      const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
+      
+      if (!supportedMimeType) {
+        throw new Error('No supported audio format found for recording.');
+      }
+      
       const options = { mimeType: supportedMimeType };
       
       mediaRecorderRef.current = new MediaRecorder(stream, options);
@@ -66,10 +71,14 @@ export default function Home() {
       console.error('Error starting recording:', error);
       setIsRecording(false);
       setUserInput('');
+      let description = "Could not start recording. Please ensure you have given microphone permissions.";
+      if (error instanceof Error) {
+        description = error.message;
+      }
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Could not start recording. Please ensure you have given microphone permissions.",
+        description: description,
       });
     }
   };
@@ -120,7 +129,6 @@ export default function Home() {
     if (audioUrl && audioRef.current) {
       audioRef.current.play();
     } else if (transcription) {
-      // Read out the transcription
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(transcription);

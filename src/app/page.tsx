@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Mic, Loader2, Volume2, Menu, Settings, Play } from 'lucide-react';
@@ -165,9 +166,11 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">
       <header className="flex justify-end items-center p-4">
-        <Button variant="ghost" size="icon">
-          <Settings className="w-6 h-6 text-muted-foreground" />
-        </Button>
+        <Link href="/settings">
+          <Button variant="ghost" size="icon">
+            <Settings className="w-6 h-6 text-muted-foreground" />
+          </Button>
+        </Link>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8">

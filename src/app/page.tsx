@@ -6,7 +6,7 @@ import { Mic, Send, Loader2, Volume2, Menu, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
 import ProtectedPage from '@/components/auth/ProtectedPage';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
 
 function HomePage() {
@@ -23,7 +23,6 @@ function HomePage() {
 
   const { toast } = useToast();
   const auth = useAuth();
-  const user = useUser();
   const router = useRouter();
 
 
@@ -249,3 +248,4 @@ export default function Home() {
     </ProtectedPage>
   );
 }
+    

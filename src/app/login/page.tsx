@@ -121,7 +121,7 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
+  
   const handleAppleSignIn = () => {
     toast({
       title: 'Apple Sign-In Not Implemented',
@@ -129,7 +129,7 @@ export default function LoginPage() {
         'Setting up Apple Sign-In requires a paid Apple Developer account and additional manual configuration.',
     });
   };
-  
+
   const handlePasswordReset = async () => {
     if (!auth) return;
      if (!email) {
@@ -222,7 +222,7 @@ export default function LoginPage() {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
+                  <span className="bg-card px-2 text-muted-foreground">
                     Or continue with
                   </span>
                 </div>
@@ -294,7 +294,7 @@ export default function LoginPage() {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
+                  <span className="bg-card px-2 text-muted-foreground">
                     Or continue with
                   </span>
                 </div>
@@ -314,3 +314,4 @@ export default function LoginPage() {
     </div>
   );
 }
+    

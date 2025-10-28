@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,9 +49,15 @@ export default function SettingsPage() {
     }, {} as Record<Emotion, Color>)
   );
   const [micAccess, setMicAccess] = useState(true);
+  const router = useRouter();
 
   const handleColorChange = (emotion: Emotion, color: Color) => {
     setEmotionColors((prev) => ({ ...prev, [emotion]: color }));
+  };
+
+  const handleSaveChanges = () => {
+    // Logic to save settings would go here
+    router.push('/');
   };
   
   return (
@@ -138,15 +145,18 @@ export default function SettingsPage() {
           <Switch checked={micAccess} onCheckedChange={setMicAccess} />
         </div>
 
-        <div className="flex items-center justify-between mb-8 cursor-pointer">
+        <Link href="/personalize" className="flex items-center justify-between mb-8 cursor-pointer">
           <div>
             <h3 className="text-lg font-semibold">Personalize</h3>
             <p className="text-sm text-muted-foreground">Add custom sounds and words</p>
           </div>
           <ChevronRight className="w-6 h-6 text-muted-foreground" />
-        </div>
+        </Link>
 
-        <Button className="w-full h-14 rounded-full text-lg font-semibold bg-primary hover:bg-primary/90 mt-auto mb-4">
+        <Button 
+          className="w-full h-14 rounded-full text-lg font-semibold bg-primary hover:bg-primary/90 mt-auto mb-4"
+          onClick={handleSaveChanges}
+        >
             Save Changes
         </Button>
       </main>

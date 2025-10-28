@@ -5,11 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Mic, Send, Loader2, Volume2, Menu, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { transcribeWithHuggingFace } from '@/ai/flows/transcribe-with-hugging-face';
-import ProtectedPage from '@/components/auth/ProtectedPage';
-import { useAuth } from '@/firebase';
-import { useRouter } from 'next/navigation';
 
-function HomePage() {
+export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -22,20 +19,10 @@ function HomePage() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
-  const auth = useAuth();
-  const router = useRouter();
-
 
   useEffect(() => {
     setIsClient(true);
   }, []);
-
-  const handleSignOut = async () => {
-    if (auth) {
-      await auth.signOut();
-      router.push('/login');
-    }
-  };
 
   const handleStartRecording = async () => {
     setAudioUrl(null);
@@ -127,6 +114,12 @@ function HomePage() {
     try {
       let resultText = userInput;
       if (audioUrl && !userInput) {
+        // Extract mime type from data URI
+        const mimeTypeMatch = audioUrl.match(/data:(.*?);base64,/);
+        if (!mimeTypeMatch) {
+          throw new Error("Invalid audio data URI format.");
+        }
+        const mimeType = mimeTypeMatch[1];
         resultText = await transcribeWithHuggingFace({ audioDataUri: audioUrl });
       }
       setTranscription(resultText);
@@ -179,8 +172,7 @@ function HomePage() {
 
   return (
     <div className="flex flex-col h-screen w-full max-w-md mx-auto bg-background text-foreground font-body">
-      <header className="flex justify-between items-center p-4">
-        <Button variant="ghost" onClick={handleSignOut}>Sign Out</Button>
+      <header className="flex justify-end items-center p-4">
         <Button variant="ghost" size="icon">
           <Settings className="w-6 h-6 text-muted-foreground" />
         </Button>
@@ -239,13 +231,3 @@ function HomePage() {
     </div>
   );
 }
-
-
-export default function Home() {
-  return (
-    <ProtectedPage>
-      <HomePage />
-    </ProtectedPage>
-  );
-}
-    
